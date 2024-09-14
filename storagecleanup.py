@@ -1,6 +1,7 @@
 import os
 import sys
 import shutil
+import argparse
 from datetime import datetime, timedelta
 
 def get_folder_size(folder_path):
@@ -19,7 +20,7 @@ def get_files_sorted_by_age(folder_path):
             files.append((file_path, os.path.getmtime(file_path)))
     return sorted(files, key=lambda x: x[1])
 
-def cleanup_folder(mount_path):
+def cleanup_folder(mount_path, dry_run=False):
     if not os.path.exists(mount_path):
         print(f"Error: The specified path '{mount_path}' does not exist.")
         return
@@ -42,14 +43,17 @@ def cleanup_folder(mount_path):
         for file_path, _ in files_to_remove:
             if os.path.exists(file_path):
                 file_size = os.path.getsize(file_path)
-                os.remove(file_path)
+                if dry_run:
+                    print(f"Would remove: {file_path}")
+                else:
+                    os.remove(file_path)
+                    print(f"Removed: {file_path}")
                 space_freed += file_size
-                print(f"Removed: {file_path}")
 
                 if space_freed >= space_to_free:
                     break
 
-        print(f"Freed up {space_freed / (1024**3):.2f} GB of space")
+        print(f"{'Would free' if dry_run else 'Freed'} up {space_freed / (1024**3):.2f} GB of space")
 
     # Remove files older than 7 days
     seven_days_ago = datetime.now() - timedelta(days=7)
@@ -58,15 +62,18 @@ def cleanup_folder(mount_path):
         for filename in filenames:
             file_path = os.path.join(dirpath, filename)
             if os.path.getmtime(file_path) < seven_days_ago.timestamp():
-                os.remove(file_path)
-                print(f"Removed: {file_path}")
+                if dry_run:
+                    print(f"Would remove: {file_path}")
+                else:
+                    os.remove(file_path)
+                    print(f"Removed: {file_path}")
 
     print("Cleanup completed.")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python script_name.py <mount_folder_path>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Storage cleanup script")
+    parser.add_argument("mount_folder", help="Path to the mount folder")
+    parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without actually deleting files")
+    args = parser.parse_args()
 
-    mount_folder = sys.argv[1]
-    cleanup_folder(mount_folder)
+    cleanup_folder(args.mount_folder, args.dry_run)
